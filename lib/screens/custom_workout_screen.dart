@@ -114,47 +114,47 @@ class _CustomWorkoutScreenState extends State<CustomWorkoutScreen> {
             Expanded(
               child: _workoutDays.isEmpty
                   ? const Center(
-                      child: Text(
-                        'Még nincs edzésnap hozzáadva.\nAdd meg az első napot!',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
-                      ),
-                    )
+                child: Text(
+                  'Még nincs edzésnap hozzáadva.\nAdd meg az első napot!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+              )
                   : ListView.builder(
-                      itemCount: _workoutDays.length,
-                      itemBuilder: (_, i) {
-                        final day = _workoutDays[i];
-                        return Card(
-                          margin: const EdgeInsets.symmetric(vertical: 4),
-                          child: ListTile(
-                            title: Text(
-                              day['name'],
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: Text(
-                              '${day['exercises'].length} gyakorlat',
-                              style: const TextStyle(color: primaryPurple),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit, color: primaryPurple),
-                                  onPressed: () => _editDayExercises(i),
-                                  tooltip: 'Gyakorlatok szerkesztése',
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () => _removeDay(i),
-                                  tooltip: 'Nap törlése',
-                                ),
-                              ],
-                            ),
-                            onTap: () => _editDayExercises(i),
+                itemCount: _workoutDays.length,
+                itemBuilder: (_, i) {
+                  final day = _workoutDays[i];
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    child: ListTile(
+                      title: Text(
+                        day['name'],
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text(
+                        '${day['exercises'].length} gyakorlat',
+                        style: const TextStyle(color: primaryPurple),
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: primaryPurple),
+                            onPressed: () => _editDayExercises(i),
+                            tooltip: 'Gyakorlatok szerkesztése',
                           ),
-                        );
-                      },
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () => _removeDay(i),
+                            tooltip: 'Nap törlése',
+                          ),
+                        ],
+                      ),
+                      onTap: () => _editDayExercises(i),
                     ),
+                  );
+                },
+              ),
             ),
             const SizedBox(height: 20),
             SizedBox(
