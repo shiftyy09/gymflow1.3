@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
+import '../services/workout_service.dart';
+import 'workout_detail_screen.dart';
 
 class CustomDayExercisesScreen extends StatefulWidget {
   final String dayName;
@@ -18,55 +20,74 @@ class CustomDayExercisesScreen extends StatefulWidget {
 class _CustomDayExercisesScreenState extends State<CustomDayExercisesScreen> {
   late List<String> _exercises;
   final TextEditingController _exerciseController = TextEditingController();
+  final WorkoutService _service = WorkoutService();
 
   @override
   void initState() {
     super.initState();
     _exercises = List.from(widget.initialExercises);
+    _exerciseController.addListener(() => setState(() {}));
   }
 
   void _addExercise() {
-    final exerciseName = _exerciseController.text.trim();
-    if (exerciseName.isNotEmpty) {
-      setState(() => _exercises.add(exerciseName));
+    final name = _exerciseController.text.trim();
+    if (name.isNotEmpty && !_exercises.contains(name)) {
+      _exercises.add(name);
       _exerciseController.clear();
+      setState(() {});
     }
   }
 
-  void _removeExercise(int index) {
-    setState(() => _exercises.removeAt(index));
+  void _removeExercise(int i) {
+    _exercises.removeAt(i);
+    setState(() {});
   }
 
-  void _saveAndGoBack() {
-    Navigator.pop(context, _exercises);
+  Future<void> _saveDayAndStartSession() async {
+    if (_exercises.isEmpty) return;
+
+    // 1. Egyéni napot sablonként elmentjük
+    await _service.createCustomDay(
+      dayName: widget.dayName,
+      exercises: _exercises,
+    );
+
+    // 2. Betöltjük az újonnan mentett sablont
+    final templates = await _service.getTemplatesSortedByLastUsed();
+    final custom = templates.first; // a legutoljára mentett
+
+    // 3. Indítunk egy WorkoutSession-t ebből a sablonból
+    final session = await _service.startWorkoutFromTemplate(custom);
+
+    // 4. Navigálunk a részletező képernyőre
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => WorkoutDetailScreen(
+          workoutSession: session,
+          workoutService: _service,
+          customExercises: _exercises,
+        ),
+      ),
+    );
   }
 
   @override
   void dispose() {
-    _exerciseController.dispose();
+    _exerciseController
+      ..removeListener(() {})
+      ..dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final canSave = _exercises.isNotEmpty;
+    final canSave = _exercises.isNotEmpty || _exerciseController.text.trim().isNotEmpty;
     return Scaffold(
       appBar: AppBar(
         title: Text('${widget.dayName} – Gyakorlatok'),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        actions: [
-          TextButton(
-            onPressed: canSave ? _saveAndGoBack : null,
-            child: Text(
-              'Mentés',
-              style: TextStyle(
-                color: canSave ? primaryPurple : Colors.grey,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -76,20 +97,30 @@ class _CustomDayExercisesScreenState extends State<CustomDayExercisesScreen> {
               controller: _exerciseController,
               decoration: const InputDecoration(
                 hintText: 'Gyakorlat neve...',
+                prefixIcon: Icon(Icons.fitness_center),
                 fillColor: Colors.white24,
                 filled: true,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.all(Radius.circular(12)),
                   borderSide: BorderSide.none,
                 ),
-                prefixIcon: Icon(Icons.fitness_center),
               ),
               onSubmitted: (_) => _addExercise(),
             ),
             const SizedBox(height: 16),
             Expanded(
               child: _exercises.isEmpty
-                  ? const Center(child: Text('Nincsenek gyakorlatok még.'))
+                  ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Text('Nincsenek gyakorlatok még.'),
+                  SizedBox(height: 8),
+                  Text(
+                    'Adj hozzá legalább 1 gyakorlatot a mentéshez.',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent),
+                  ),
+                ],
+              )
                   : ListView.builder(
                 itemCount: _exercises.length,
                 itemBuilder: (_, i) => ListTile(
@@ -102,23 +133,19 @@ class _CustomDayExercisesScreenState extends State<CustomDayExercisesScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                canSave
-                    ? '${_exercises.length} gyakorlat készen áll a mentésre.'
-                    : 'Adj hozzá legalább 1 gyakorlatot a mentéshez.',
-                style: TextStyle(
-                  color: canSave ? Colors.green : Colors.redAccent,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
             ElevatedButton(
-              onPressed: canSave ? _saveAndGoBack : null,
+              onPressed: canSave ? () {
+                if (_exerciseController.text
+                    .trim()
+                    .isNotEmpty) {
+                  _addExercise();
+                }
+                _saveDayAndStartSession();
+              }
+              : null,
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(48),
-                backgroundColor: canSave ? Colors.green : Colors.grey,
+                backgroundColor: canSave ? primaryPurple : Colors.grey,
               ),
               child: const Text('Gyakorlatok mentése'),
             ),
