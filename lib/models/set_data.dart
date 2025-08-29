@@ -5,12 +5,12 @@ class SetData {
   SetData({required this.weight, required this.reps});
 
   Map<String, dynamic> toJson() => {
-    'weight': weight,
-    'reps': reps,
-  };
+        'weight': weight,
+        'reps': reps,
+      };
 
   static SetData fromJson(Map<String, dynamic> json) => SetData(
-    weight: (json['weight']).toDouble(),
-    reps: json['reps'],
-  );
+        weight: (json['weight']).toDouble(),
+        reps: json['reps'],
+      );
 }

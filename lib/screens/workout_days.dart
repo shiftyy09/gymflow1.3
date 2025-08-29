@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../widgets/glassmorphic_card.dart';
 
 import '../models/workout.dart';
 import '../constants.dart';
+import '../widgets/glassmorphic_card.dart';
 
 class WorkoutDaysScreen extends StatefulWidget {
   const WorkoutDaysScreen({Key? key}) : super(key: key);
 
   @override
-  State<WorkoutDaysScreen> createState() => _WorkoutDaysScreenState();
+  _WorkoutDaysScreenState createState() => _WorkoutDaysScreenState();
 }
 
 class _WorkoutDaysScreenState extends State<WorkoutDaysScreen> {
@@ -35,34 +35,37 @@ class _WorkoutDaysScreenState extends State<WorkoutDaysScreen> {
     final workoutJson = prefs.getString('workoutDays');
 
     if (workoutJson != null && workoutJson.isNotEmpty) {
-      final List decoded = List<Map<String, dynamic>>.from(
-        (workoutJson == '[]') ? [] : List<dynamic>.from(workoutJson as dynamic),
-      );
+      final List<dynamic> decoded = [];
+      try {
+        decoded.addAll(List<dynamic>.from(workoutJson as dynamic));
+      } catch (_) {}
+      final loaded = decoded.map((json) => WorkoutDay.fromJson(json)).toList();
       setState(() {
-        workoutDays = decoded.map((e) => WorkoutDay.fromJson(e)).toList();
+        workoutDays = loaded;
       });
     }
   }
 
   Future<void> _saveWorkoutDays() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      'workoutDays',
-      workoutDays.map((e) => e.toJson()).toList().toString(),
-    );
+    final String encoded = workoutDays.isEmpty
+        ? '[]'
+        : workoutDays.map((e) => e.toJson()).toString();
+    await prefs.setString('workoutDays', encoded);
   }
 
-  void _startNewWorkout() async {
-    final controller = TextEditingController();
-    final name = await showDialog<String>(
+  void _ujEdzesNap() async {
+    final szovegController = TextEditingController();
+
+    final eredmeny = await showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Új edzésnap'),
         content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: 'Pl. Mell & Tricepsz'),
+          controller: szovegController,
+          decoration: const InputDecoration(hintText: 'Pl. Mell és bicepsz'),
           autofocus: true,
         ),
         actions: [
@@ -73,8 +76,8 @@ class _WorkoutDaysScreenState extends State<WorkoutDaysScreen> {
           ElevatedButton(
             child: const Text('Indítás'),
             onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                Navigator.pop(context, controller.text.trim());
+              if (szovegController.text.trim().isNotEmpty) {
+                Navigator.pop(context, szovegController.text.trim());
               }
             },
           ),
@@ -82,12 +85,12 @@ class _WorkoutDaysScreenState extends State<WorkoutDaysScreen> {
       ),
     );
 
-    if (name != null) {
+    if (eredmeny != null) {
       setState(() {
         workoutDays.insert(
             0,
             WorkoutDay(
-              name: name,
+              name: eredmeny,
               date: DateTime.now(),
               exercises: [],
             ));
@@ -96,14 +99,14 @@ class _WorkoutDaysScreenState extends State<WorkoutDaysScreen> {
     }
   }
 
-  void _deleteWorkout(int index) {
+  void _torolEdzesNap(int index) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Biztos törlöd?'),
-        content: Text('Törlöd a "${workoutDays[index].name}" edzésnapot?'),
+        content: Text('Törlöd az edzésnapot: "${workoutDays[index].name}"?'),
         actions: [
           TextButton(
             child: const Text('Mégse'),
@@ -125,8 +128,8 @@ class _WorkoutDaysScreenState extends State<WorkoutDaysScreen> {
     );
   }
 
-  String _formatDate(DateTime dt) =>
-      '${dt.year}.${dt.month.toString().padLeft(2, '0')}.${dt.day.toString().padLeft(2, '0')}';
+  String _formatDatum(DateTime datum) =>
+      '${datum.year}.${datum.month.toString().padLeft(2, '0')}.${datum.day.toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
@@ -135,6 +138,14 @@ class _WorkoutDaysScreenState extends State<WorkoutDaysScreen> {
         title: Text('Helló, $userName!'),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              Navigator.pushNamed(context, '/profile');
+            },
+          ),
+        ],
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -149,7 +160,7 @@ class _WorkoutDaysScreenState extends State<WorkoutDaysScreen> {
                     Icon(Icons.fitness_center, size: 90, color: Colors.white),
                     SizedBox(height: 20),
                     Text(
-                      'Kezdd el az első edzésnapod!',
+                      'Legyen ez az első edzésed!',
                       style: TextStyle(color: Colors.white, fontSize: 20),
                     ),
                   ],
@@ -162,20 +173,18 @@ class _WorkoutDaysScreenState extends State<WorkoutDaysScreen> {
                   final day = workoutDays[index];
                   return Card(
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                        borderRadius: BorderRadius.circular(16)),
                     elevation: 6,
                     margin: const EdgeInsets.symmetric(vertical: 6),
                     child: ListTile(
                       title: Text(day.name),
-                      subtitle: Text(
-                          '${day.exercises.length} gyakorlat  •  ${_formatDate(day.date)}'),
+                      subtitle: Text('${day.exercises.length} gyakorlat — ${_formatDatum(day.date)}'),
                       trailing: IconButton(
                         icon: const Icon(Icons.delete, color: Colors.redAccent),
-                        onPressed: () => _deleteWorkout(index),
+                        onPressed: () => _torolEdzesNap(index),
                       ),
                       onTap: () {
-                        // Ide jön majd a WorkoutDetailScreen-re navigálás
+                        // Itt később nyisd meg a részleteket
                       },
                     ),
                   );
@@ -183,7 +192,7 @@ class _WorkoutDaysScreenState extends State<WorkoutDaysScreen> {
               ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _startNewWorkout,
+        onPressed: _ujEdzesNap,
         child: const Icon(Icons.add),
       ),
     );

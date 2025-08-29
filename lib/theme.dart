@@ -1,77 +1,39 @@
 import 'package:flutter/material.dart';
 
-// Erőteljes, modern férfias színpaletta
-
-const Color primaryPurple = Color(0xFFFF383B);    // fő szín: energikus piros (ne használj lila szót a dizájnban, csak a kompatibilitás miatt maradt ez a név)
-const Color accentPink = Color(0xFFFF383B);       // narancsos akcentus
-const Color gradientStart = Color(0xFF151515);    // fő háttér
-const Color gradientEnd = Color(0xFF151515);      // szürkésebb háttér (pl. card dobozok)
-const Color cardBackground = Color(0xFF545454);
-const Color lightPurple = Color(0xFF545454);      // halványszürke háttér elem
-const Color darkPurple = Color(0xFF191919);       // nagyon sötét területekre
-const Color lightGray = Color(0xFF26282B);        // kiegészítő világosszürke
-const Color darkGray = Color(0xFFF5F5F5);         // világos szöveg
+const Color primaryPurple = Color(0xFF6C5CE7);
+const Color gradientStart = Color(0xFF74B9FF);
+const Color gradientEnd = Color(0xFDA854FF);
+const Color accentPink = Color(0xFFFF6B9D);
+const Color lightPurple = Color(0xFFA29BFE);
+const Color darkGray = Color(0xFF2D3748);
+const Color cardBackground = Color(0xFFFFFFFF);
+const Color lightGray = Color(0xFFF8F9FA);
 
 ThemeData appTheme() {
   return ThemeData(
-    brightness: Brightness.dark,
+    brightness: Brightness.light,
     primaryColor: primaryPurple,
-    scaffoldBackgroundColor: gradientStart,
-    colorScheme: ColorScheme.dark(
+    scaffoldBackgroundColor: lightGray,
+    colorScheme: const ColorScheme.light(
       primary: primaryPurple,
       secondary: accentPink,
-      background: gradientStart,
-      surface: cardBackground,
-      onPrimary: Colors.white,
-      onSurface: Colors.white,
-      onBackground: Colors.white,
     ),
     cardTheme: const CardThemeData(
-      color: cardBackground,
-      elevation: 10,
-      shadowColor: lightGray,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(20)),
-      ),
-    ),
+  color: cardBackground,
+  elevation: 8,
+  shadowColor: Colors.black12,
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(20))),
+),
+
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,
       elevation: 0,
-      iconTheme: IconThemeData(color: primaryPurple),
       titleTextStyle: TextStyle(
-        color: Colors.white,
+        color: darkGray,
         fontSize: 24,
         fontWeight: FontWeight.bold,
       ),
-    ),
-    floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: primaryPurple,
-      foregroundColor: gradientStart,
-      elevation: 6,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(16)),
-      ),
-    ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: primaryPurple,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        textStyle: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    ),
-    textTheme: const TextTheme(
-      bodyLarge: TextStyle(color: Colors.white),
-      bodyMedium: TextStyle(color: Colors.white),
-      bodySmall: TextStyle(color: Colors.white),
-      titleLarge: TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.bold,
-        fontSize: 20,
-      ),
+      iconTheme: IconThemeData(color: darkGray),
     ),
   );
 }
