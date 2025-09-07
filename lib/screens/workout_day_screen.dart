@@ -1,88 +1,71 @@
 import 'package:flutter/material.dart';
 import '../models/workout_session.dart';
-import '../services/workout_service.dart';
-import 'workout_detail_screen.dart';
 
 class WorkoutDayScreen extends StatefulWidget {
   final WorkoutSession session;
-  const WorkoutDayScreen({super.key, required this.session});
+
+  const WorkoutDayScreen({
+    super.key,
+    required this.session,
+  });
 
   @override
   State<WorkoutDayScreen> createState() => _WorkoutDayScreenState();
 }
 
 class _WorkoutDayScreenState extends State<WorkoutDayScreen> {
-  late List<String> _exercises;
-  final TextEditingController _controller = TextEditingController();
-  final WorkoutService _service = WorkoutService();
+  final TextEditingController exerciseController = TextEditingController();
+  final List<String> dayExercises = [];
+  bool _isInitialized = false; // Guard a duplikáció ellen
 
   @override
   void initState() {
     super.initState();
-    // Kezdetben a sablonból örökölt gyakorlatok nevei
-    _exercises = widget.session.exerciseSessions
-        .map((es) => es.exerciseName)
-        .toList();
+
+    // Csak egyszer fusson le az inicializálás
+    if (!_isInitialized) {
+      _isInitialized = true;
+
+      // Alapgyakorlatok hozzáadása (ha vannak)
+      if (widget.session.exerciseSessions.isNotEmpty) {
+        for (var exercise in widget.session.exerciseSessions) {
+          dayExercises.add(exercise.exerciseName);
+        }
+      }
+    }
   }
 
-  void _addExercise() {
-    final name = _controller.text.trim();
-    if (name.isEmpty) return;
+  void addExercise() {
+    final name = exerciseController.text.trim();
+    if (name.isNotEmpty) {
+      setState(() {
+        // Deduplikáció - csak akkor adjuk hozzá, ha még nincs benne
+        if (!dayExercises.contains(name)) {
+          dayExercises.add(name);
+        }
+      });
+      exerciseController.clear();
+    }
+  }
+
+  void removeExercise(int index) {
     setState(() {
-      _exercises.add(name);
-      _controller.clear();
+      dayExercises.removeAt(index);
     });
   }
 
-  void _removeExercise(int index) {
-    setState(() {
-      _exercises.removeAt(index);
-    });
-  }
-
-  Future<void> _proceedToDetail() async {
-    // Frissítjük a session exerciseSessions listát
-    final updatedSessions = _exercises.map((name) {
-      final existing = widget.session.exerciseSessions.firstWhere(
-            (es) => es.exerciseName == name,
-        orElse: () => ExerciseSession(
-          exerciseTemplateId: 'custom_$name',
-          exerciseName: name,
-          sets: [],
-        ),
-      );
-      return existing;
-    }).toList();
-
-    final updatedSession =
-    widget.session.copyWith(exerciseSessions: updatedSessions);
-    await _service.saveSession(updatedSession);
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => WorkoutDetailScreen(
-          workoutSession: updatedSession,
-          workoutService: _service,
-          customExercises: _exercises,
-        ),
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  // Deduplikált lista visszaadása
+  List<String> get uniqueExercises {
+    return dayExercises.toSet().toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    final canProceed = _exercises.isNotEmpty;
+    final exercises = uniqueExercises;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.session.templateName} – Gyakorlatok'),
+        title: const Text('Nap gyakorlatok'),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -90,63 +73,92 @@ class _WorkoutDayScreenState extends State<WorkoutDayScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Dinamikus sablonkártya
-            Card(
-              margin: const EdgeInsets.only(bottom: 16),
-              child: ListTile(
-                leading: const Icon(Icons.fitness_center),
-                title: Text(widget.session.templateName),
-              ),
+            // Gyakorlat hozzáadása
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: exerciseController,
+                    decoration: const InputDecoration(
+                      hintText: 'Gyakorlat neve...',
+                      fillColor: Colors.white24,
+                      filled: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onSubmitted: (_) => addExercise(),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: addExercise,
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(64, 48),
+                  ),
+                  child: const Text('Hozzáadás'),
+                ),
+              ],
             ),
-
-            // Új gyakorlat bevitele
-            TextField(
-              controller: _controller,
-              decoration: const InputDecoration(
-                hintText: 'Új gyakorlat neve...',
-                prefixIcon: Icon(Icons.add),
-                border: OutlineInputBorder(),
-              ),
-              onSubmitted: (_) => _addExercise(),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
 
             // Gyakorlatok listája
             Expanded(
-              child: _exercises.isEmpty
-                  ? const Center(child: Text('Nincsenek gyakorlatok még.'))
+              child: exercises.isEmpty
+                  ? const Center(
+                child: Text(
+                  'Még nincs gyakorlat hozzáadva.\nAdd meg az első gyakorlatot!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+              )
                   : ListView.builder(
-                itemCount: _exercises.length,
-                itemBuilder: (_, i) => ListTile(
-                  title: Text(_exercises[i]),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => _removeExercise(i),
-                  ),
+                itemCount: exercises.length,
+                itemBuilder: (context, i) {
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    child: ListTile(
+                      title: Text(exercises[i]),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete),
+                        color: Colors.red,
+                        onPressed: () => removeExercise(i),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Mentés gomb
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context, exercises);
+                },
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  backgroundColor: Colors.green,
+                ),
+                child: const Text(
+                  'Gyakorlatok mentése',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
                 ),
               ),
             ),
           ],
         ),
       ),
-
-      // Egyetlen alsó gomb
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(16),
-        child: ElevatedButton(
-          onPressed: canProceed ? _proceedToDetail : null,
-          style: ElevatedButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-            backgroundColor: canProceed ? Colors.green : Colors.grey,
-            shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          child: const Text(
-            'Tovább az edzéshez',
-            style: TextStyle(color: Colors.black),
-          ),
-        ),
-      ),
     );
+  }
+
+  @override
+  void dispose() {
+    exerciseController.dispose();
+    super.dispose();
   }
 }

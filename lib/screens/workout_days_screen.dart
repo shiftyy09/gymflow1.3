@@ -1,13 +1,8 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'workout_day_screen.dart';
-
 import '../theme.dart';
 import '../models/workout_template.dart';
 import '../services/workout_service.dart';
-import 'workout_day_screen.dart';
 import 'workout_detail_screen.dart';
 import 'bmi_form.dart';
 
@@ -21,8 +16,9 @@ class WorkoutDaysScreen extends StatefulWidget {
 class _WorkoutDaysScreenState extends State<WorkoutDaysScreen> {
   List<WorkoutTemplate> workoutTemplates = [];
   String userName = '';
-  final WorkoutService _workoutService = WorkoutService();
-  bool _isLoading = true;
+  final WorkoutService workoutService = WorkoutService();
+  bool isLoading = true;
+  bool _isInitialized = false; // Guard a duplikáció ellen
 
   @override
   void initState() {
@@ -33,44 +29,65 @@ class _WorkoutDaysScreenState extends State<WorkoutDaysScreen> {
 
   Future<void> _loadUserName() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() => userName = prefs.getString('nickname') ?? 'Sportoló');
+    setState(() {
+      userName = prefs.getString('nickname') ?? 'Sportoló';
+    });
   }
 
   Future<void> _initializeApp() async {
-    setState(() => _isLoading = true);
-    await _workoutService.createDefaultTemplates();
+    // Csak egyszer fusson le az inicializálás
+    if (_isInitialized) return;
+    _isInitialized = true;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    // Alapértelmezett sablonok létrehozása (első indításkor)
+    await workoutService.createDefaultTemplates();
+
+    // Sablonok betöltése
     await _loadWorkoutTemplates();
-    setState(() => _isLoading = false);
+
+    setState(() {
+      isLoading = false;
+    });
   }
 
   Future<void> _loadWorkoutTemplates() async {
-    final templates = await _workoutService.getTemplatesSortedByLastUsed();
-    setState(() => workoutTemplates = templates);
+    final templates = await workoutService.getTemplatesSortedByLastUsed();
+
+    // Deduplikáljuk a sablonokat ID alapján
+    final uniqueTemplates = <String, WorkoutTemplate>{};
+    for (var template in templates) {
+      uniqueTemplates[template.id] = template;
+    }
+
+    setState(() {
+      workoutTemplates = uniqueTemplates.values.toList();
+    });
   }
 
-  Future<void> _startWorkout(WorkoutTemplate template) async {
+  Future<void> startWorkout(WorkoutTemplate template) async {
     try {
-      final session = await _workoutService.startWorkoutFromTemplate(template);
-      // Léptessük először a nap szerkesztő képernyőre
-      final customExercises = await Navigator.push<List<String>>(
+      // Új edzés indítása a sablonból
+      final session = await workoutService.startWorkoutFromTemplate(template);
+
+      // Navigálás az edzés részleteihez
+      final result = await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => WorkoutDayScreen(session: session),
-        ),
-      );
-      // Majd a részletező képernyőre a custom gyakorlatokkal
-      await Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => WorkoutDetailScreen(
+          builder: (context) => WorkoutDetailScreen(
             workoutSession: session,
-            workoutService: _workoutService,
-            customExercises: customExercises ?? [],
+            workoutService: workoutService,
           ),
         ),
       );
-      // Visszatérés után frissítjük a listát
-      await _loadWorkoutTemplates();
+
+      // Ha visszatértünk, frissítjük a sablonokat
+      if (result == true) {
+        await _loadWorkoutTemplates();
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -84,31 +101,44 @@ class _WorkoutDaysScreenState extends State<WorkoutDaysScreen> {
   Future<void> _createNewTemplate() async {
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
+
     final result = await showDialog<Map<String, String>>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (context) => AlertDialog(
         backgroundColor: cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Új Edzéssablon 🏋️', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Új Edzéssablon',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: nameController,
-                decoration: const InputDecoration(labelText: 'Sablon neve', hintText: 'Pl. MELL vagy HÁT'),
+                decoration: const InputDecoration(
+                  hintText: 'Pl. MELL vagy HÁT',
+                  labelText: 'Sablon neve',
+                ),
                 autofocus: true,
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: descriptionController,
-                decoration: const InputDecoration(labelText: 'Leírás (opcionális)', hintText: 'Pl. Mellkas és tricepsz edzés'),
+                decoration: const InputDecoration(
+                  hintText: 'Pl. Mellkas és tricepsz edzés',
+                  labelText: 'Leírás (opcionális)',
+                ),
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Mégse')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Mégse'),
+          ),
           ElevatedButton(
             onPressed: () {
               if (nameController.text.trim().isNotEmpty) {
@@ -123,19 +153,27 @@ class _WorkoutDaysScreenState extends State<WorkoutDaysScreen> {
         ],
       ),
     );
+
     if (result == null) return;
+
     try {
-      await _workoutService.createTemplate(
+      await workoutService.createTemplate(
         name: result['name']!,
         description: result['description']!.isEmpty ? null : result['description'],
       );
       await _loadWorkoutTemplates();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Új sablon sikeresen létrehozva!'), backgroundColor: primaryPurple),
+        const SnackBar(
+          content: Text('Új sablon sikeresen létrehozva!'),
+          backgroundColor: primaryPurple,
+        ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Hiba a sablon létrehozásakor: $e'), backgroundColor: Colors.redAccent),
+        SnackBar(
+          content: Text('Hiba a sablon létrehozásakor: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
       );
     }
   }
@@ -143,26 +181,37 @@ class _WorkoutDaysScreenState extends State<WorkoutDaysScreen> {
   void _deleteTemplate(WorkoutTemplate template) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (context) => AlertDialog(
         backgroundColor: cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Sablon törlése'),
-        content: Text('Biztos törlöd a "${template.name}" sablont?\n\nEz nem törli a korábbi edzésnapló bejegyzéseket.'),
+        content: Text(
+          'Biztos törlöd a "${template.name}" sablont?\n(Ez nem törli a korábbi edzésnaplió bejegyzéseket.)',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Mégse')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Mégse'),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
             onPressed: () async {
               Navigator.pop(context);
               try {
-                await _workoutService.deleteTemplate(template.id);
+                await workoutService.deleteTemplate(template.id);
                 await _loadWorkoutTemplates();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Sablon törölve!'), backgroundColor: Colors.redAccent),
+                  const SnackBar(
+                    content: Text('Sablon törölve!'),
+                    backgroundColor: Colors.redAccent,
+                  ),
                 );
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Hiba a törléskor: $e'), backgroundColor: Colors.redAccent),
+                  SnackBar(
+                    content: Text('Hiba a törlésnél: $e'),
+                    backgroundColor: Colors.redAccent,
+                  ),
                 );
               }
             },
@@ -176,19 +225,28 @@ class _WorkoutDaysScreenState extends State<WorkoutDaysScreen> {
   String _formatLastUsed(DateTime lastUsed) {
     final now = DateTime.now();
     final difference = now.difference(lastUsed);
-    if (difference.inDays == 0) return 'Ma';
-    if (difference.inDays == 1) return 'Tegnap';
-    if (difference.inDays < 7) return '${difference.inDays} napja';
-    return '${lastUsed.year}.${lastUsed.month.toString().padLeft(2, '0')}.${lastUsed.day.toString().padLeft(2, '0')}';
+
+    if (difference.inDays == 0) {
+      return 'Ma';
+    } else if (difference.inDays == 1) {
+      return 'Tegnap';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} napja';
+    } else {
+      return '${lastUsed.year}.${lastUsed.month.toString().padLeft(2, '0')}.${lastUsed.day.toString().padLeft(2, '0')}';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    if (isLoading) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: primaryPurple)),
+        body: Center(
+          child: CircularProgressIndicator(color: primaryPurple),
+        ),
       );
     }
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -207,54 +265,88 @@ class _WorkoutDaysScreenState extends State<WorkoutDaysScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Helló, $userName! 👋',
-                            style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                        Text(
+                          'Helló, $userName!',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         const SizedBox(height: 8),
-                        const Text('Melyik edzéssablonnal kezdünk?', style: TextStyle(color: Colors.white70)),
+                        const Text(
+                          'Melyik edzéssablonnal kezdünk?',
+                          style: TextStyle(color: Colors.white70),
+                        ),
                       ],
                     ),
                   ),
                 ),
               ),
             ),
-            actions: [IconButton(onPressed: _createNewTemplate, icon: const Icon(Icons.add, color: Colors.white))],
+            actions: [
+              IconButton(
+                onPressed: _createNewTemplate,
+                icon: const Icon(Icons.add),
+                color: Colors.white,
+              ),
+            ],
           ),
           SliverList(
             delegate: SliverChildBuilderDelegate(
-                  (_, idx) {
+                  (context, idx) {
                 final template = workoutTemplates[idx];
                 return Card(
                   margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   elevation: 4,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   child: ListTile(
                     contentPadding: const EdgeInsets.all(16),
-                    title: Text(template.name,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    title: Text(
+                      template.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (template.description?.isNotEmpty == true) Text(template.description!),
+                        if (template.description?.isNotEmpty == true)
+                          Text(template.description!),
                         const SizedBox(height: 4),
                         Text(
                           '${template.exerciseTemplates.length} gyakorlat • Utoljára: ${_formatLastUsed(template.lastUsed)}',
-                          style: const TextStyle(color: primaryPurple, fontSize: 12),
+                          style: const TextStyle(
+                            color: primaryPurple,
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
                     trailing: PopupMenuButton(
                       icon: const Icon(Icons.more_vert),
-                      itemBuilder: (context) => const [
-                        PopupMenuItem(
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
                           value: 'delete',
-                          child: Row(children: [Icon(Icons.delete, color: Colors.redAccent), SizedBox(width: 8), Text('Törlés')]),
-                        )
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, color: Colors.redAccent),
+                              SizedBox(width: 8),
+                              Text('Törlés'),
+                            ],
+                          ),
+                        ),
                       ],
                       onSelected: (value) {
-                        if (value == 'delete') _deleteTemplate(template);
+                        if (value == 'delete') {
+                          _deleteTemplate(template);
+                        }
                       },
                     ),
-                    onTap: () => _startWorkout(template),
+                    onTap: () => startWorkout(template),
                   ),
                 );
               },
@@ -268,11 +360,21 @@ class _WorkoutDaysScreenState extends State<WorkoutDaysScreen> {
                 child: Center(
                   child: Column(
                     children: [
-                      Icon(Icons.fitness_center, size: 64, color: Colors.grey),
+                      Icon(
+                        Icons.fitness_center,
+                        size: 64,
+                        color: Colors.grey,
+                      ),
                       SizedBox(height: 16),
-                      Text('Még nincsenek edzéssablonok', style: TextStyle(fontSize: 18, color: Colors.grey)),
+                      Text(
+                        'Még nincsenek edzéssablonok',
+                        style: TextStyle(fontSize: 18, color: Colors.grey),
+                      ),
                       SizedBox(height: 8),
-                      Text('Hozz létre egyet a + gombbal!', style: TextStyle(color: Colors.grey)),
+                      Text(
+                        'Hozz létre egyet a + gombbal!',
+                        style: TextStyle(color: Colors.grey),
+                      ),
                     ],
                   ),
                 ),
