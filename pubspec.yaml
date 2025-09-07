@@ -20,6 +20,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/gymflo_logo.png
+    - assets/gymflow_logo.png
 
 
